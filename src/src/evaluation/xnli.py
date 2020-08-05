@@ -22,14 +22,29 @@ from ..data.dataset import ParallelDataset
 from ..data.loader import load_binarized, set_dico_parameters
 
 
-XNLI_LANGS = ['ar', 'bg', 'de', 'el', 'en', 'es', 'fr', 'hi', 'ru', 'sw', 'th', 'tr', 'ur', 'vi', 'zh']
+XNLI_LANGS = [
+    "ar",
+    "bg",
+    "de",
+    "el",
+    "en",
+    "es",
+    "fr",
+    "hi",
+    "ru",
+    "sw",
+    "th",
+    "tr",
+    "ur",
+    "vi",
+    "zh",
+]
 
 
 logger = getLogger()
 
 
 class XNLI:
-
     def __init__(self, embedder, scores, params):
         """
         Initialize XNLI trainer / evaluator.
@@ -43,11 +58,11 @@ class XNLI:
         """
         Get a monolingual data iterator.
         """
-        assert splt in ['valid', 'test'] or splt == 'train' and lang == 'en'
-        return self.data[lang][splt]['x'].get_iterator(
-            shuffle=(splt == 'train'),
+        assert splt in ["valid", "test"] or splt == "train" and lang == "en"
+        return self.data[lang][splt]["x"].get_iterator(
+            shuffle=(splt == "train"),
             group_by_size=self.params.group_by_size,
-            return_indices=True
+            return_indices=True,
         )
 
     def run(self):
@@ -58,23 +73,30 @@ class XNLI:
 
         # load data
         self.data = self.load_data()
-        if not self.data['dico'] == self._embedder.dico:
-            raise Exception(("Dictionary in evaluation data (%i words) seems different than the one " +
-                             "in the pretrained model (%i words). Please verify you used the same dictionary, " +
-                             "and the same values for max_vocab and min_count.") % (len(self.data['dico']), len(self._embedder.dico)))
+        if not self.data["dico"] == self._embedder.dico:
+            raise Exception(
+                (
+                    "Dictionary in evaluation data (%i words) seems different than the one "
+                    + "in the pretrained model (%i words). Please verify you used the same dictionary, "
+                    + "and the same values for max_vocab and min_count."
+                )
+                % (len(self.data["dico"]), len(self._embedder.dico))
+            )
 
         # embedder
         self.embedder = copy.deepcopy(self._embedder)
         self.embedder.cuda()
 
         # projection layer
-        self.proj = nn.Sequential(*[
-            nn.Dropout(params.dropout),
-            nn.Linear(self.embedder.out_dim, 3)
-        ]).cuda()
+        self.proj = nn.Sequential(
+            *[nn.Dropout(params.dropout), nn.Linear(self.embedder.out_dim, 3)]
+        ).cuda()
 
         # optimizers
-        self.optimizer_e = get_optimizer(list(self.embedder.get_parameters(params.finetune_layers)), params.optimizer_e)
+        self.optimizer_e = get_optimizer(
+            list(self.embedder.get_parameters(params.finetune_layers)),
+            params.optimizer_e,
+        )
         self.optimizer_p = get_optimizer(self.proj.parameters(), params.optimizer_p)
 
         # train and evaluate the model
@@ -107,8 +129,8 @@ class XNLI:
         nw = 0  # number of words
         t = time.time()
 
-        iterator = self.get_iterator('train', 'en')
-        lang_id = params.lang2id['en']
+        iterator = self.get_iterator("train", "en")
+        lang_id = params.lang2id["en"]
 
         while True:
 
@@ -121,20 +143,26 @@ class XNLI:
             sent1, len1 = truncate(sent1, len1, params.max_len, params.eos_index)
             sent2, len2 = truncate(sent2, len2, params.max_len, params.eos_index)
             x, lengths, positions, langs = concat_batches(
-                sent1, len1, lang_id,
-                sent2, len2, lang_id,
+                sent1,
+                len1,
+                lang_id,
+                sent2,
+                len2,
+                lang_id,
                 params.pad_index,
                 params.eos_index,
-                reset_positions=False
+                reset_positions=False,
             )
-            y = self.data['en']['train']['y'][idx]
+            y = self.data["en"]["train"]["y"][idx]
             bs = len(len1)
 
             # cuda
             x, y, lengths, positions, langs = to_cuda(x, y, lengths, positions, langs)
 
             # loss
-            output = self.proj(self.embedder.get_embeddings(x, lengths, positions, langs))
+            output = self.proj(
+                self.embedder.get_embeddings(x, lengths, positions, langs)
+            )
             loss = F.cross_entropy(output, y)
 
             # backward / optimization
@@ -151,7 +179,15 @@ class XNLI:
 
             # log
             if ns % (100 * bs) < bs:
-                logger.info("XNLI - Epoch %i - Train iter %7i - %.1f words/s - Loss: %.4f" % (self.epoch, ns, nw / (time.time() - t), sum(losses) / len(losses)))
+                logger.info(
+                    "XNLI - Epoch %i - Train iter %7i - %.1f words/s - Loss: %.4f"
+                    % (
+                        self.epoch,
+                        ns,
+                        nw / (time.time() - t),
+                        sum(losses) / len(losses),
+                    )
+                )
                 nw, t = 0, time.time()
                 losses = []
 
@@ -167,9 +203,9 @@ class XNLI:
         self.embedder.eval()
         self.proj.eval()
 
-        scores = OrderedDict({'epoch': self.epoch})
+        scores = OrderedDict({"epoch": self.epoch})
 
-        for splt in ['valid', 'test']:
+        for splt in ["valid", "test"]:
 
             for lang in XNLI_LANGS:
                 if lang not in params.lang2id:
@@ -184,19 +220,27 @@ class XNLI:
                     # batch
                     (sent1, len1), (sent2, len2), idx = batch
                     x, lengths, positions, langs = concat_batches(
-                        sent1, len1, lang_id,
-                        sent2, len2, lang_id,
+                        sent1,
+                        len1,
+                        lang_id,
+                        sent2,
+                        len2,
+                        lang_id,
                         params.pad_index,
                         params.eos_index,
-                        reset_positions=False
+                        reset_positions=False,
                     )
-                    y = self.data[lang][splt]['y'][idx]
+                    y = self.data[lang][splt]["y"][idx]
 
                     # cuda
-                    x, y, lengths, positions, langs = to_cuda(x, y, lengths, positions, langs)
+                    x, y, lengths, positions, langs = to_cuda(
+                        x, y, lengths, positions, langs
+                    )
 
                     # forward
-                    output = self.proj(self.embedder.get_embeddings(x, lengths, positions, langs))
+                    output = self.proj(
+                        self.embedder.get_embeddings(x, lengths, positions, langs)
+                    )
                     predictions = output.data.max(1)[1]
 
                     # update statistics
@@ -205,8 +249,11 @@ class XNLI:
 
                 # compute accuracy
                 acc = 100.0 * valid / total
-                scores['xnli_%s_%s_acc' % (splt, lang)] = acc
-                logger.info("XNLI - %s - %s - Epoch %i - Acc: %.1f%%" % (splt, lang, self.epoch, acc))
+                scores["xnli_%s_%s_acc" % (splt, lang)] = acc
+                logger.info(
+                    "XNLI - %s - %s - Epoch %i - Acc: %.1f%%"
+                    % (splt, lang, self.epoch, acc)
+                )
 
         logger.info("__log__:%s" % json.dumps(scores))
         return scores
@@ -216,39 +263,48 @@ class XNLI:
         Load XNLI cross-lingual classification data.
         """
         params = self.params
-        data = {lang: {splt: {} for splt in ['train', 'valid', 'test']} for lang in XNLI_LANGS}
-        label2id = {'contradiction': 0, 'neutral': 1, 'entailment': 2}
-        dpath = os.path.join(params.data_path, 'eval', 'XNLI')
+        data = {
+            lang: {splt: {} for splt in ["train", "valid", "test"]}
+            for lang in XNLI_LANGS
+        }
+        label2id = {"contradiction": 0, "neutral": 1, "entailment": 2}
+        dpath = os.path.join(params.data_path, "eval", "XNLI")
 
-        for splt in ['train', 'valid', 'test']:
+        for splt in ["train", "valid", "test"]:
 
             for lang in XNLI_LANGS:
 
                 # only English has a training set
-                if splt == 'train' and lang != 'en':
-                    del data[lang]['train']
+                if splt == "train" and lang != "en":
+                    del data[lang]["train"]
                     continue
 
                 # load data and dictionary
-                data1 = load_binarized(os.path.join(dpath, '%s.s1.%s.pth' % (splt, lang)), params)
-                data2 = load_binarized(os.path.join(dpath, '%s.s2.%s.pth' % (splt, lang)), params)
-                data['dico'] = data.get('dico', data1['dico'])
+                data1 = load_binarized(
+                    os.path.join(dpath, "%s.s1.%s.pth" % (splt, lang)), params
+                )
+                data2 = load_binarized(
+                    os.path.join(dpath, "%s.s2.%s.pth" % (splt, lang)), params
+                )
+                data["dico"] = data.get("dico", data1["dico"])
 
                 # set dictionary parameters
-                set_dico_parameters(params, data, data1['dico'])
-                set_dico_parameters(params, data, data2['dico'])
+                set_dico_parameters(params, data, data1["dico"])
+                set_dico_parameters(params, data, data2["dico"])
 
                 # create dataset
-                data[lang][splt]['x'] = ParallelDataset(
-                    data1['sentences'], data1['positions'],
-                    data2['sentences'], data2['positions'],
-                    params
+                data[lang][splt]["x"] = ParallelDataset(
+                    data1["sentences"],
+                    data1["positions"],
+                    data2["sentences"],
+                    data2["positions"],
+                    params,
                 )
 
                 # load labels
-                with open(os.path.join(dpath, '%s.label.%s' % (splt, lang)), 'r') as f:
+                with open(os.path.join(dpath, "%s.label.%s" % (splt, lang)), "r") as f:
                     labels = [label2id[l.rstrip()] for l in f]
-                data[lang][splt]['y'] = torch.LongTensor(labels)
-                assert len(data[lang][splt]['x']) == len(data[lang][splt]['y'])
+                data[lang][splt]["y"] = torch.LongTensor(labels)
+                assert len(data[lang][splt]["x"]) == len(data[lang][splt]["y"])
 
         return data

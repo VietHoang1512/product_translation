@@ -15,7 +15,7 @@ def convert_to_unicode(text):
     Converts `text` to Unicode (if it's not already), assuming UTF-8 input.
     """
     # six_ensure_text is copied from https://github.com/benjaminp/six
-    def six_ensure_text(s, encoding='utf-8', errors='strict'):
+    def six_ensure_text(s, encoding="utf-8", errors="strict"):
         if isinstance(s, six.binary_type):
             return s.decode(encoding, errors)
         elif isinstance(s, six.text_type):
@@ -43,4 +43,4 @@ def run_strip_accents(text):
 for line in sys.stdin:
     line = convert_to_unicode(line.rstrip().lower())
     line = run_strip_accents(line)
-    print(u'%s' % line.lower())
+    print(u"%s" % line.lower())

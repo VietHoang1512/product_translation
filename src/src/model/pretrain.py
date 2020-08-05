@@ -21,8 +21,10 @@ def load_fasttext_model(path):
     try:
         import fastText
     except ImportError:
-        raise Exception("Unable to import fastText. Please install fastText for Python: "
-                        "https://github.com/facebookresearch/fastText")
+        raise Exception(
+            "Unable to import fastText. Please install fastText for Python: "
+            "https://github.com/facebookresearch/fastText"
+        )
     return fastText.load_model(path)
 
 
@@ -35,21 +37,23 @@ def read_txt_embeddings(path, params):
 
     # load pretrained embeddings
     _emb_dim_file = params.emb_dim
-    with io.open(path, 'r', encoding='utf-8', newline='\n', errors='ignore') as f:
+    with io.open(path, "r", encoding="utf-8", newline="\n", errors="ignore") as f:
         for i, line in enumerate(f):
             if i == 0:
                 split = line.split()
                 assert len(split) == 2
                 assert _emb_dim_file == int(split[1])
                 continue
-            word, vect = line.rstrip().split(' ', 1)
-            vect = np.fromstring(vect, sep=' ')
+            word, vect = line.rstrip().split(" ", 1)
+            vect = np.fromstring(vect, sep=" ")
             if word in word2id:
-                logger.warning("Word \"%s\" found twice!" % word)
+                logger.warning('Word "%s" found twice!' % word)
                 continue
             if not vect.shape == (_emb_dim_file,):
-                logger.warning("Invalid dimension (%i) for word \"%s\" in line %i."
-                               % (vect.shape[0], word, i))
+                logger.warning(
+                    'Invalid dimension (%i) for word "%s" in line %i.'
+                    % (vect.shape[0], word, i)
+                )
                 continue
             assert vect.shape == (_emb_dim_file,)
             word2id[word] = len(word2id)
@@ -89,7 +93,7 @@ def load_embeddings(path, params):
     """
     Reload pretrained embeddings.
     """
-    if path.endswith('.bin'):
+    if path.endswith(".bin"):
         return load_bin_embeddings(path, params)
     else:
         return read_txt_embeddings(path, params)

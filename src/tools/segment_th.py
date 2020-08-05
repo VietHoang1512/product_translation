@@ -9,5 +9,5 @@ import sys
 from pythainlp.tokenize import word_tokenize
 
 for line in sys.stdin.readlines():
-    line = line.rstrip('\n')
-    print(' '.join(word_tokenize(line)))
+    line = line.rstrip("\n")
+    print(" ".join(word_tokenize(line)))
